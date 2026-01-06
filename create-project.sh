@@ -298,9 +298,7 @@ EOF
     ;;
 esac
 
-# --- Git & remotes setup (GitHub + GitLab auto-create) -----------------------
-
-# Initialize Git (if not already a repo)
+# --- Git initialization ------------------------------------------------------
 if [ ! -d .git ]; then
   git init
   echo "✅ Git repository initialized"
@@ -308,142 +306,19 @@ else
   echo "ℹ️ Git repository already initialized"
 fi
 
-PROJECT_NAME=$(basename "$PWD")
+# --- Initialize BMAD method --------------------------------------------------
+echo -e "\n🤖 Would you like to "BMAD-ify" this project for Claude Code? (y/n)"
+read -p "→ " CONFIRM_BMAD
 
-echo
-read -rp "Do you want to auto-create GitHub + GitLab repos and configure remotes? [y/N] " CONFIRM_REMOTE
-CONFIRM_REMOTE=${CONFIRM_REMOTE:-n}
+if [[ "$CONFIRM_BMAD" =~ ^[Yy]$ ]]; then
+    echo "⏳ Preparing BMAD expert team..."
+    # Launch the official installer.
+    # The script is already in the right folder thanks to previous 'cd' commands.
+    npx bmad-method@alpha install
 
-if [[ "$CONFIRM_REMOTE" =~ ^[Yy]$ ]]; then
-  # Ensure there is at least one commit
-  if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
-    echo
-    read -rp "No commit found. Create an initial commit with all files? [y/N] " DO_COMMIT
-    DO_COMMIT=${DO_COMMIT:-n}
-    if [[ "$DO_COMMIT" =~ ^[Yy]$ ]]; then
-      git add .
-      git commit -m "Initial commit"
-      echo "✅ Initial commit created"
-    else
-      echo "⚠️ No commit created. Push may fail if there is nothing to send."
-    fi
-  fi
-
-  GH_URL=""
-  GL_URL=""
-
-  echo
-  echo "👉 Creating remote repositories (if CLIs are available)..."
-  echo
-
-  # --- GitHub: create repo and get SSH URL ----------------------------------
-  if command -v gh >/dev/null 2>&1; then
-    echo "📦 GitHub CLI (gh) detected."
-
-    # Check if repo already exists under the authenticated account
-    if gh repo view "$PROJECT_NAME" >/dev/null 2>&1; then
-      echo "ℹ️ GitHub repo '$PROJECT_NAME' already exists. Skipping creation."
-    else
-      echo "➡️ Creating GitHub repo '$PROJECT_NAME' (private)..."
-      if gh repo create "$PROJECT_NAME" --private --confirm; then
-        echo "✅ GitHub repo created."
-      else
-        echo "⚠️ Failed to create GitHub repo with gh."
-      fi
-    fi
-
-    # Try to fetch the SSH URL
-    GH_URL=$(gh repo view "$PROJECT_NAME" --json sshUrl -q .sshUrl 2>/dev/null || echo "")
-    if [ -n "$GH_URL" ]; then
-      echo "🔗 GitHub SSH URL: $GH_URL"
-    else
-      echo "⚠️ Could not retrieve GitHub SSH URL."
-    fi
-  else
-    echo "⚠️ GitHub CLI (gh) not found. Skipping GitHub repo creation."
-  fi
-
-  echo
-
-  # --- GitLab: create repo and get SSH URL ----------------------------------
-  if command -v glab >/dev/null 2>&1; then
-    echo "📦 GitLab CLI (glab) detected."
-
-    # Check if repo already exists under the authenticated namespace
-    if glab repo view "$PROJECT_NAME" >/dev/null 2>&1; then
-      echo "ℹ️ GitLab repo '$PROJECT_NAME' already exists. Skipping creation."
-    else
-      echo "➡️ Creating GitLab repo '$PROJECT_NAME' (private)..."
-      if glab repo create "$PROJECT_NAME" --private; then
-        echo "✅ GitLab repo created."
-      else
-        echo "⚠️ Failed to create GitLab repo with glab."
-      fi
-    fi
-
-    # Try to fetch the SSH URL
-    GL_URL=$(glab repo view "$PROJECT_NAME" --json ssh_url_to_repo --jq .ssh_url_to_repo 2>/dev/null || echo "")
-    if [ -n "$GL_URL" ]; then
-      echo "🔗 GitLab SSH URL: $GL_URL"
-    else
-      echo "⚠️ Could not retrieve GitLab SSH URL."
-    fi
-  else
-    echo "⚠️ GitLab CLI (glab) not found. Skipping GitLab repo creation."
-  fi
-
-  echo
-
-  # If we have at least a GitHub URL, configure origin
-  if [ -n "$GH_URL" ]; then
-    # Remove existing origin if needed
-    if git remote get-url origin >/dev/null 2>&1; then
-      echo "ℹ️ A remote named 'origin' already exists. Removing it..."
-      git remote remove origin
-    fi
-
-    echo "🔗 Adding origin -> GitHub (${GH_URL})"
-    git remote add origin "$GH_URL"
-
-    # Detect current branch name
-    BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
-    echo "📦 Detected branch: $BRANCH"
-
-    echo "⬆️ Pushing initial commit to GitHub..."
-    if git push -u origin "$BRANCH"; then
-      echo "✅ Initial push to GitHub successful"
-    else
-      echo "❌ Push to GitHub failed. Check your GitHub permissions or repo visibility."
-    fi
-
-    echo
-    echo "⚙️ Configuring multi-push (GitHub + GitLab) for 'origin'..."
-
-    # Start with GitHub as push URL
-    git remote set-url --add --push origin "$GH_URL"
-
-    # Add GitLab as second push URL if available
-    if [ -n "$GL_URL" ]; then
-      git remote set-url --add --push origin "$GL_URL"
-      echo "✅ Multi-push configured with GitHub and GitLab."
-    else
-      echo "ℹ️ GitLab SSH URL not available. Multi-push will only use GitHub."
-    fi
-
-    echo
-    echo "✅ Git configuration completed. Current remotes:"
-    git remote -v
-
-    echo
-    echo "👉 From now on, every 'Sync changes' in Windsurf will push to all 'origin' push URLs (GitHub and GitLab if configured)."
-  else
-    echo "❌ No valid GitHub SSH URL detected. Skipping remote configuration."
-    echo "   Make sure 'gh' is installed and authenticated, then configure remotes manually if needed."
-  fi
-
-else
-  echo "ℹ️ Skipping remote creation and configuration. Git is local only for now."
+    echo "✅ BMAD structure (Docs, .bmad) and Claude Code commands ready."
 fi
+# -----------------------------------------------------------------------------
 
 # Ask to open in editor
 echo -e "\n🛠️  Open project in editor?"
